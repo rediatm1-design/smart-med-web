@@ -27,6 +27,7 @@ function App() {
 
       <div className="page-container">
         {page === "login" && <Login setPage={setPage} />}
+        {page === "signup" && <Signup setPage={setPage} />}
         {page === "dashboard" && <Dashboard patients={patients} alerts={alerts} />}
         {page === "patients" && <Patients patients={patients} />}
         {page === "medications" && <Medications />}
@@ -65,6 +66,78 @@ function Login({ setPage }) {
 
         <button className="primary-btn" onClick={() => setPage("dashboard")}>
           Log In
+        </button>
+
+        <p style={{ marginTop: "15px" }}>Don't have an account?</p>
+        <button className="primary-btn" onClick={() => setPage("signup")}>
+          Sign Up
+        </button>
+      </div>
+    </div>
+  );
+}
+function Signup({ setPage }) {
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  const handleSignup = () => {
+  // 1. Check empty
+  if (!email.trim()) {
+    setError("Email is required.");
+    return;
+  }
+
+  // 2. Check valid email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!emailRegex.test(email)) {
+    setError("Please enter a valid email address.");
+    return;
+  }
+
+  // 3. Success
+  setError("");
+  setPage("dashboard");
+};
+
+  return (
+    <div className="login-wrapper">
+      <div className="login-card">
+        <h2>Create Account</h2>
+        <p>Sign up to access the Smart Medication Reminder System.</p>
+
+        <input
+          type="text"
+          placeholder="Full Name"
+          value={fullName}
+          onChange={(e) => setFullName(e.target.value)}
+        />
+
+        <input
+          type="email"
+          placeholder="Email address *"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+
+        {error && <p style={{ color: "red", marginTop: "10px" }}>{error}</p>}
+
+        <button className="primary-btn" onClick={handleSignup}>
+          Sign Up
+        </button>
+
+        <p style={{ marginTop: "15px" }}>Already have an account?</p>
+        <button className="primary-btn" onClick={() => setPage("login")}>
+          Back to Login
         </button>
       </div>
     </div>
