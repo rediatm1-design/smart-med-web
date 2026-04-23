@@ -1,44 +1,173 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import "./App.css";
+
+const API_BASE_URL = "https://medication.infancyapp.com/api";
 
 function App() {
   const [page, setPage] = useState("login");
+  const [token, setToken] = useState(localStorage.getItem("token") || "");
 
-  const patients = [
-    { id: 1, name: "John Doe", age: 78, role: "Patient", status: "Stable" },
-    { id: 2, name: "Mary Smith", age: 82, role: "Patient", status: "Needs Attention" },
-    { id: 3, name: "Robert Brown", age: 75, role: "Patient", status: "Stable" },
-  ];
+  const [patients, setPatients] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [summary, setSummary] = useState(null);
 
-  const history = [
-    { id: 1, patient: "John Doe", medication: "Aspirin", time: "8:00 AM", status: "Taken" },
-    { id: 2, patient: "Mary Smith", medication: "Metformin", time: "9:00 AM", status: "Missed" },
-    { id: 3, patient: "Robert Brown", medication: "Vitamin D", time: "1:00 PM", status: "Taken" },
-  ];
+  const [loadingPatients, setLoadingPatients] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [loadingAlerts, setLoadingAlerts] = useState(false);
+  const [loadingSummary, setLoadingSummary] = useState(false);
 
-  const alerts = [
-    { id: 1, patient: "Mary Smith", alert: "Missed Dose", time: "9:00 AM" },
-    { id: 2, patient: "John Doe", alert: "Refill Due", time: "Today" },
-  ];
+  const [globalError, setGlobalError] = useState("");
+  const [selectedPatientId, setSelectedPatientId] = useState("");
+  const [saveMessage, setSaveMessage] = useState("");
+
+  useEffect(() => {
+    if (!token) return;
+
+    const headers = {
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    };
+
+    setGlobalError("");
+
+    setLoadingPatients(true);
+    fetch(`${API_BASE_URL}/patients?per_page=10`, { headers })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || "Failed to load patients");
+        return data;
+      })
+      .then((data) => {
+        const patientList = data.data || data || [];
+        setPatients(patientList);
+        if (patientList.length > 0 && !selectedPatientId) {
+          setSelectedPatientId(String(patientList[0].id));
+        }
+      })
+      .catch((err) => setGlobalError(err.message))
+      .finally(() => setLoadingPatients(false));
+
+    setLoadingAlerts(true);
+    fetch(`${API_BASE_URL}/alerts?per_page=10`, { headers })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || "Failed to load alerts");
+        return data;
+      })
+      .then((data) => setAlerts(data.data || data || []))
+      .catch((err) => setGlobalError(err.message))
+      .finally(() => setLoadingAlerts(false));
+
+    setLoadingHistory(true);
+    fetch(`${API_BASE_URL}/medication-history?per_page=10`, { headers })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || "Failed to load history");
+        return data;
+      })
+      .then((data) => setHistory(data.data || data || []))
+      .catch((err) => setGlobalError(err.message))
+      .finally(() => setLoadingHistory(false));
+
+    setLoadingSummary(true);
+    fetch(`${API_BASE_URL}/dashboard/summary`, { headers })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || "Failed to load dashboard summary");
+        return data;
+      })
+      .then((data) => setSummary(data))
+      .catch((err) => setGlobalError(err.message))
+      .finally(() => setLoadingSummary(false));
+  }, [token, selectedPatientId]);
+
+  const handleLogout = async () => {
+    try {
+      if (token) {
+        await fetch(`${API_BASE_URL}/auth/logout`, {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      }
+    } catch (err) {
+      // ignore logout backend errors for now
+    } finally {
+      localStorage.removeItem("token");
+      setToken("");
+      setPatients([]);
+      setHistory([]);
+      setAlerts([]);
+      setSummary(null);
+      setPage("login");
+    }
+  };
 
   return (
     <div className="app">
-      {page !== "login" && <Navbar setPage={setPage} />}
+      {page !== "login" && page !== "signup" && (
+        <Navbar setPage={setPage} onLogout={handleLogout} />
+      )}
 
       <div className="page-container">
-        {page === "login" && <Login setPage={setPage} />}
+        {globalError && (
+          <p style={{ color: "red", marginBottom: "15px" }}>{globalError}</p>
+        )}
+
+        {saveMessage && (
+          <p style={{ color: "green", marginBottom: "15px" }}>{saveMessage}</p>
+        )}
+
+        {page === "login" && (
+          <Login
+            setPage={setPage}
+            setToken={setToken}
+            setGlobalError={setGlobalError}
+          />
+        )}
+
         {page === "signup" && <Signup setPage={setPage} />}
-        {page === "dashboard" && <Dashboard patients={patients} alerts={alerts} />}
-        {page === "patients" && <Patients patients={patients} />}
-        {page === "medications" && <Medications />}
-        {page === "alerts" && <Alerts alerts={alerts} />}
-        {page === "history" && <History history={history} />}
+
+        {page === "dashboard" && (
+          <Dashboard
+            patients={patients}
+            alerts={alerts}
+            summary={summary}
+            loadingSummary={loadingSummary}
+          />
+        )}
+
+        {page === "patients" && (
+          <Patients patients={patients} loadingPatients={loadingPatients} />
+        )}
+
+        {page === "medications" && (
+          <Medications
+            token={token}
+            patients={patients}
+            selectedPatientId={selectedPatientId}
+            setSelectedPatientId={setSelectedPatientId}
+            setSaveMessage={setSaveMessage}
+            setGlobalError={setGlobalError}
+          />
+        )}
+
+        {page === "alerts" && (
+          <Alerts alerts={alerts} loadingAlerts={loadingAlerts} />
+        )}
+
+        {page === "history" && (
+          <History history={history} loadingHistory={loadingHistory} />
+        )}
       </div>
     </div>
   );
 }
 
-function Navbar({ setPage }) {
+function Navbar({ setPage, onLogout }) {
   return (
     <nav className="navbar">
       <h1 className="logo">Smart Medication Reminder</h1>
@@ -48,24 +177,88 @@ function Navbar({ setPage }) {
         <button onClick={() => setPage("medications")}>Medications</button>
         <button onClick={() => setPage("alerts")}>Alerts</button>
         <button onClick={() => setPage("history")}>History</button>
-        <button onClick={() => setPage("login")}>Logout</button>
+        <button onClick={onLogout}>Logout</button>
       </div>
     </nav>
   );
 }
 
-function Login({ setPage }) {
+function Login({ setPage, setToken, setGlobalError }) {
+  const [email, setEmail] = useState("caregiver@example.com");
+  const [password, setPassword] = useState("password123");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    setError("");
+    setGlobalError("");
+
+    if (!email.trim() || !password.trim()) {
+      setError("Email and password are required.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.message || "Login failed.");
+        return;
+      }
+
+      if (!data.token) {
+        setError("No token returned from server.");
+        return;
+      }
+
+      localStorage.setItem("token", data.token);
+      setToken(data.token);
+      setPage("dashboard");
+    } catch (err) {
+      setError("Unable to connect to server.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="login-wrapper">
       <div className="login-card">
         <h2>Welcome</h2>
         <p>Login to access the caregiver and medical support dashboard.</p>
 
-        <input type="text" placeholder="Email address" />
-        <input type="password" placeholder="Password" />
+        <input
+          type="email"
+          placeholder="Email address"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
 
-        <button className="primary-btn" onClick={() => setPage("dashboard")}>
-          Log In
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+
+        {error && <p style={{ color: "red", marginTop: "10px" }}>{error}</p>}
+
+        <button className="primary-btn" onClick={handleLogin} disabled={loading}>
+          {loading ? "Logging In..." : "Log In"}
         </button>
 
         <p style={{ marginTop: "15px" }}>Don't have an account?</p>
@@ -76,31 +269,40 @@ function Login({ setPage }) {
     </div>
   );
 }
+
 function Signup({ setPage }) {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
 
   const handleSignup = () => {
-  // 1. Check empty
-  if (!email.trim()) {
-    setError("Email is required.");
-    return;
-  }
+    if (!email.trim()) {
+      setError("Email is required.");
+      setInfo("");
+      return;
+    }
 
-  // 2. Check valid email format
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  if (!emailRegex.test(email)) {
-    setError("Please enter a valid email address.");
-    return;
-  }
+    if (!emailRegex.test(email)) {
+      setError("Please enter a valid email address.");
+      setInfo("");
+      return;
+    }
 
-  // 3. Success
-  setError("");
-  setPage("dashboard");
-};
+    if (!password.trim()) {
+      setError("Password is required.");
+      setInfo("");
+      return;
+    }
+
+    setError("");
+    setInfo(
+      "Signup UI is ready, but backend registration route is not available yet. Please use login for now."
+    );
+  };
 
   return (
     <div className="login-wrapper">
@@ -124,12 +326,13 @@ function Signup({ setPage }) {
 
         <input
           type="password"
-          placeholder="Password"
+          placeholder="Password *"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
 
         {error && <p style={{ color: "red", marginTop: "10px" }}>{error}</p>}
+        {info && <p style={{ color: "green", marginTop: "10px" }}>{info}</p>}
 
         <button className="primary-btn" onClick={handleSignup}>
           Sign Up
@@ -144,32 +347,36 @@ function Signup({ setPage }) {
   );
 }
 
-function Dashboard({ patients, alerts }) {
+function Dashboard({ patients, alerts, summary, loadingSummary }) {
   return (
     <div>
       <h2 className="page-title">Dashboard</h2>
 
-      <div className="cards">
-        <div className="card">
-          <h3>Total Patients</h3>
-          <p>{patients.length}</p>
-        </div>
+      {loadingSummary ? (
+        <p>Loading dashboard summary...</p>
+      ) : (
+        <div className="cards">
+          <div className="card">
+            <h3>Total Patients</h3>
+            <p>{summary?.total_patients ?? patients.length}</p>
+          </div>
 
-        <div className="card">
-          <h3>Missed Doses</h3>
-          <p>1</p>
-        </div>
+          <div className="card">
+            <h3>Missed Doses</h3>
+            <p>{summary?.missed_doses ?? 0}</p>
+          </div>
 
-        <div className="card">
-          <h3>Active Alerts</h3>
-          <p>{alerts.length}</p>
-        </div>
+          <div className="card">
+            <h3>Active Alerts</h3>
+            <p>{summary?.active_alerts ?? alerts.length}</p>
+          </div>
 
-        <div className="card">
-          <h3>Upcoming Refills</h3>
-          <p>2</p>
+          <div className="card">
+            <h3>Upcoming Refills</h3>
+            <p>{summary?.upcoming_refills ?? 0}</p>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="section">
         <h3>Recent Alerts</h3>
@@ -182,13 +389,19 @@ function Dashboard({ patients, alerts }) {
             </tr>
           </thead>
           <tbody>
-            {alerts.map((item) => (
-              <tr key={item.id}>
-                <td>{item.patient}</td>
-                <td>{item.alert}</td>
-                <td>{item.time}</td>
+            {alerts.length === 0 ? (
+              <tr>
+                <td colSpan="3">No alerts found.</td>
               </tr>
-            ))}
+            ) : (
+              alerts.map((item, index) => (
+                <tr key={item.id || index}>
+                  <td>{item.patient?.full_name || item.patient || "N/A"}</td>
+                  <td>{item.alert_type || item.alert || "N/A"}</td>
+                  <td>{item.created_at || item.time || "N/A"}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -196,7 +409,7 @@ function Dashboard({ patients, alerts }) {
   );
 }
 
-function Patients({ patients }) {
+function Patients({ patients, loadingPatients }) {
   return (
     <div>
       <h2 className="page-title">Patient Management</h2>
@@ -204,132 +417,291 @@ function Patients({ patients }) {
       <div className="section">
         <button className="primary-btn small-btn">+ Add Patient</button>
 
-        <table>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Age</th>
-              <th>Role</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {patients.map((patient) => (
-              <tr key={patient.id}>
-                <td>{patient.name}</td>
-                <td>{patient.age}</td>
-                <td>{patient.role}</td>
-                <td>{patient.status}</td>
+        {loadingPatients ? (
+          <p>Loading patients...</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Age</th>
+                <th>Status</th>
+                <th>Gender</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {patients.length === 0 ? (
+                <tr>
+                  <td colSpan="4">No patients found.</td>
+                </tr>
+              ) : (
+                patients.map((patient, index) => (
+                  <tr key={patient.id || index}>
+                    <td>{patient.full_name || patient.name}</td>
+                    <td>{patient.age}</td>
+                    <td>{patient.status}</td>
+                    <td>{patient.gender || "N/A"}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
 }
 
-function Medications() {
+function Medications({
+  token,
+  patients,
+  selectedPatientId,
+  setSelectedPatientId,
+  setSaveMessage,
+  setGlobalError,
+}) {
+  const [medicationName, setMedicationName] = useState("");
+  const [dosage, setDosage] = useState("");
+  const [frequency, setFrequency] = useState("daily");
+  const [scheduledTime, setScheduledTime] = useState("");
+  const [instructions, setInstructions] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleSaveSchedule = async () => {
+    setSaveMessage("");
+    setGlobalError("");
+
+    if (!selectedPatientId) {
+      setGlobalError("Please select a patient.");
+      return;
+    }
+
+    if (!medicationName.trim() || !dosage.trim() || !scheduledTime.trim() || !startDate.trim()) {
+      setGlobalError("Medication name, dosage, time, and start date are required.");
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/patients/${selectedPatientId}/medication-schedules`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            medication_name: medicationName,
+            dosage,
+            frequency,
+            scheduled_time: scheduledTime,
+            instructions,
+            start_date: startDate,
+            end_date: endDate || null,
+            is_active: true,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setGlobalError(data.message || "Failed to save medication schedule.");
+        return;
+      }
+
+      setSaveMessage("Medication schedule saved successfully.");
+      setMedicationName("");
+      setDosage("");
+      setFrequency("daily");
+      setScheduledTime("");
+      setInstructions("");
+      setStartDate("");
+      setEndDate("");
+    } catch (err) {
+      setGlobalError("Unable to connect to server.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div>
       <h2 className="page-title">Medication Schedule</h2>
 
       <div className="form-card">
         <div className="form-row">
-          <label>Patient Name</label>
-          <input type="text" placeholder="Enter patient name" />
-        </div>
-
-        <div className="form-row">
-          <label>Medication Name</label>
-          <input type="text" placeholder="Enter medication name" />
-        </div>
-
-        <div className="form-row">
-          <label>Dosage</label>
-          <input type="text" placeholder="Example: 100mg" />
-        </div>
-
-        <div className="form-row">
-          <label>Frequency</label>
-          <select>
-            <option>Once Daily</option>
-            <option>Twice Daily</option>
-            <option>Three Times Daily</option>
+          <label>Patient</label>
+          <select
+            value={selectedPatientId}
+            onChange={(e) => setSelectedPatientId(e.target.value)}
+          >
+            <option value="">Select a patient</option>
+            {patients.map((patient) => (
+              <option key={patient.id} value={patient.id}>
+                {patient.full_name || patient.name}
+              </option>
+            ))}
           </select>
         </div>
 
         <div className="form-row">
-          <label>Time</label>
-          <input type="time" />
+          <label>Medication Name</label>
+          <input
+            type="text"
+            placeholder="Enter medication name"
+            value={medicationName}
+            onChange={(e) => setMedicationName(e.target.value)}
+          />
+        </div>
+
+        <div className="form-row">
+          <label>Dosage</label>
+          <input
+            type="text"
+            placeholder="Example: 100mg"
+            value={dosage}
+            onChange={(e) => setDosage(e.target.value)}
+          />
+        </div>
+
+        <div className="form-row">
+          <label>Frequency</label>
+          <select value={frequency} onChange={(e) => setFrequency(e.target.value)}>
+            <option value="daily">Daily</option>
+            <option value="twice_daily">Twice Daily</option>
+            <option value="three_times_daily">Three Times Daily</option>
+          </select>
+        </div>
+
+        <div className="form-row">
+          <label>Scheduled Time</label>
+          <input
+            type="time"
+            value={scheduledTime}
+            onChange={(e) => setScheduledTime(e.target.value)}
+          />
         </div>
 
         <div className="form-row">
           <label>Instructions</label>
-          <textarea placeholder="Enter medication instructions"></textarea>
+          <textarea
+            placeholder="Enter medication instructions"
+            value={instructions}
+            onChange={(e) => setInstructions(e.target.value)}
+          ></textarea>
         </div>
 
-        <button className="primary-btn">Save Schedule</button>
+        <div className="form-row">
+          <label>Start Date</label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+        </div>
+
+        <div className="form-row">
+          <label>End Date</label>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
+        </div>
+
+        <button className="primary-btn" onClick={handleSaveSchedule} disabled={saving}>
+          {saving ? "Saving..." : "Save Schedule"}
+        </button>
       </div>
     </div>
   );
 }
 
-function Alerts({ alerts }) {
+function Alerts({ alerts, loadingAlerts }) {
   return (
     <div>
       <h2 className="page-title">Alerts</h2>
 
       <div className="section">
-        <table>
-          <thead>
-            <tr>
-              <th>Patient</th>
-              <th>Alert Type</th>
-              <th>Time</th>
-            </tr>
-          </thead>
-          <tbody>
-            {alerts.map((item) => (
-              <tr key={item.id}>
-                <td>{item.patient}</td>
-                <td>{item.alert}</td>
-                <td>{item.time}</td>
+        {loadingAlerts ? (
+          <p>Loading alerts...</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Patient</th>
+                <th>Alert Type</th>
+                <th>Time</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {alerts.length === 0 ? (
+                <tr>
+                  <td colSpan="3">No alerts found.</td>
+                </tr>
+              ) : (
+                alerts.map((item, index) => (
+                  <tr key={item.id || index}>
+                    <td>{item.patient?.full_name || "N/A"}</td>
+                    <td>{item.alert_type || item.alert || "N/A"}</td>
+                    <td>{item.created_at || item.time || "N/A"}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
 }
 
-function History({ history }) {
+function History({ history, loadingHistory }) {
   return (
     <div>
       <h2 className="page-title">Medication History</h2>
 
       <div className="section">
-        <table>
-          <thead>
-            <tr>
-              <th>Patient</th>
-              <th>Medication</th>
-              <th>Time</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {history.map((item) => (
-              <tr key={item.id}>
-                <td>{item.patient}</td>
-                <td>{item.medication}</td>
-                <td>{item.time}</td>
-                <td>{item.status}</td>
+        {loadingHistory ? (
+          <p>Loading medication history...</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Patient</th>
+                <th>Medication</th>
+                <th>Time</th>
+                <th>Status</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {history.length === 0 ? (
+                <tr>
+                  <td colSpan="4">No medication history found.</td>
+                </tr>
+              ) : (
+                history.map((item, index) => (
+                  <tr key={item.id || index}>
+                    <td>{item.patient?.full_name || "N/A"}</td>
+                    <td>
+                      {item.medication_schedule?.medication_name ||
+                        item.medication ||
+                        "N/A"}
+                    </td>
+                    <td>{item.event_time || item.time || "N/A"}</td>
+                    <td>{item.status}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
