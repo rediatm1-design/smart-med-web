@@ -269,18 +269,24 @@ function Login({ setPage, setToken, setGlobalError }) {
     </div>
   );
 }
-
 function Signup({ setPage }) {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [info, setInfo] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSignup = () => {
+  const handleSignup = async () => {
+    setError("");
+
+    // Validation
+    if (!fullName.trim()) {
+      setError("Full name is required.");
+      return;
+    }
+
     if (!email.trim()) {
       setError("Email is required.");
-      setInfo("");
       return;
     }
 
@@ -288,20 +294,53 @@ function Signup({ setPage }) {
 
     if (!emailRegex.test(email)) {
       setError("Please enter a valid email address.");
-      setInfo("");
       return;
     }
 
     if (!password.trim()) {
       setError("Password is required.");
-      setInfo("");
       return;
     }
 
-    setError("");
-    setInfo(
-      "Signup UI is ready, but backend registration route is not available yet. Please use login for now."
-    );
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          name: fullName,
+          email: email,
+          password: password,
+          password_confirmation: password,
+          role: "caregiver",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.message || "Signup failed.");
+        return;
+      }
+
+      // Success
+      alert("Account created successfully. Please log in.");
+      setPage("login");
+
+    } catch (err) {
+      setError("Unable to connect to server.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -312,7 +351,7 @@ function Signup({ setPage }) {
 
         <input
           type="text"
-          placeholder="Full Name"
+          placeholder="Full Name *"
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
         />
@@ -326,20 +365,28 @@ function Signup({ setPage }) {
 
         <input
           type="password"
-          placeholder="Password *"
+          placeholder="Password * (min 8 characters)"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
 
-        {error && <p style={{ color: "red", marginTop: "10px" }}>{error}</p>}
-        {info && <p style={{ color: "green", marginTop: "10px" }}>{info}</p>}
+        {error && (
+          <p style={{ color: "red", marginTop: "10px" }}>{error}</p>
+        )}
 
-        <button className="primary-btn" onClick={handleSignup}>
-          Sign Up
+        <button
+          className="primary-btn"
+          onClick={handleSignup}
+          disabled={loading}
+        >
+          {loading ? "Signing Up..." : "Sign Up"}
         </button>
 
         <p style={{ marginTop: "15px" }}>Already have an account?</p>
-        <button className="primary-btn" onClick={() => setPage("login")}>
+        <button
+          className="primary-btn"
+          onClick={() => setPage("login")}
+        >
           Back to Login
         </button>
       </div>
