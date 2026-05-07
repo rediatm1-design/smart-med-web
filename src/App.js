@@ -160,8 +160,12 @@ function App() {
         )}
 
         {page === "alerts" && (
-          <Alerts alerts={alerts} loadingAlerts={loadingAlerts} />
-        )}
+  <Alerts
+    alerts={alerts}
+    loadingAlerts={loadingAlerts}
+    token={token}
+  />
+)}
 
         {page === "history" && (
           <History history={history} loadingHistory={loadingHistory} />
@@ -786,10 +790,53 @@ function Medications({
   );
 }
 
-function Alerts({ alerts, loadingAlerts }) {
+function Alerts({ alerts, loadingAlerts, token }) {
+  const [message, setMessage] = useState("");
+  const [acknowledgingId, setAcknowledgingId] = useState(null);
+
+  const handleAcknowledge = async (alertId) => {
+    setMessage("");
+    setAcknowledgingId(alertId);
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/alerts/${alertId}/acknowledge`,
+        {
+          method: "PATCH",
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage(data.message || "Failed to acknowledge alert.");
+        return;
+      }
+
+      setMessage("Alert acknowledged successfully.");
+
+      // Simple refresh so updated alert status shows
+      window.location.reload();
+    } catch (err) {
+      setMessage("Unable to connect to server.");
+    } finally {
+      setAcknowledgingId(null);
+    }
+  };
+
   return (
     <div>
       <h2 className="page-title">Alerts</h2>
+
+      {message && (
+        <p style={{ color: message.includes("successfully") ? "green" : "red" }}>
+          {message}
+        </p>
+      )}
 
       <div className="section">
         {loadingAlerts ? (
@@ -801,66 +848,47 @@ function Alerts({ alerts, loadingAlerts }) {
                 <th>Patient</th>
                 <th>Alert Type</th>
                 <th>Time</th>
+                <th>Status</th>
+                <th>Action</th>
               </tr>
             </thead>
+
             <tbody>
               {alerts.length === 0 ? (
                 <tr>
-                  <td colSpan="3">No alerts found.</td>
+                  <td colSpan="5">No alerts found.</td>
                 </tr>
               ) : (
-                alerts.map((item, index) => (
-                  <tr key={item.id || index}>
-                    <td>{item.patient?.full_name || "N/A"}</td>
-                    <td>{item.alert_type || item.alert || "N/A"}</td>
-                    <td>{item.created_at || item.time || "N/A"}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
-  );
-}
+                alerts.map((item, index) => {
+                  const isAcknowledged =
+                    item.is_acknowledged ||
+                    item.acknowledged_at ||
+                    item.status === "acknowledged";
 
-function History({ history, loadingHistory }) {
-  return (
-    <div>
-      <h2 className="page-title">Medication History</h2>
-
-      <div className="section">
-        {loadingHistory ? (
-          <p>Loading medication history...</p>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Patient</th>
-                <th>Medication</th>
-                <th>Time</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.length === 0 ? (
-                <tr>
-                  <td colSpan="4">No medication history found.</td>
-                </tr>
-              ) : (
-                history.map((item, index) => (
-                  <tr key={item.id || index}>
-                    <td>{item.patient?.full_name || "N/A"}</td>
-                    <td>
-                      {item.medication_schedule?.medication_name ||
-                        item.medication ||
-                        "N/A"}
-                    </td>
-                    <td>{item.event_time || item.time || "N/A"}</td>
-                    <td>{item.status}</td>
-                  </tr>
-                ))
+                  return (
+                    <tr key={item.id || index}>
+                      <td>{item.patient?.full_name || "N/A"}</td>
+                      <td>{item.alert_type || item.type || item.alert || "N/A"}</td>
+                      <td>{item.created_at || item.alert_time || item.time || "N/A"}</td>
+                      <td>{isAcknowledged ? "Acknowledged" : "Active"}</td>
+                      <td>
+                        {isAcknowledged ? (
+                          "Done"
+                        ) : (
+                          <button
+                            className="primary-btn small-btn"
+                            onClick={() => handleAcknowledge(item.id)}
+                            disabled={acknowledgingId === item.id}
+                          >
+                            {acknowledgingId === item.id
+                              ? "Acknowledging..."
+                              : "Acknowledge"}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
