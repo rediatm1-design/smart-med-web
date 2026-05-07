@@ -141,7 +141,11 @@ function App() {
         )}
 
         {page === "patients" && (
-          <Patients patients={patients} loadingPatients={loadingPatients} />
+          <Patients
+  patients={patients}
+  loadingPatients={loadingPatients}
+  token={token}
+/>
         )}
 
         {page === "medications" && (
@@ -456,13 +460,125 @@ function Dashboard({ patients, alerts, summary, loadingSummary }) {
   );
 }
 
-function Patients({ patients, loadingPatients }) {
+function Patients({ patients, loadingPatients, token }) {
+  const [showForm, setShowForm] = useState(false);
+  const [fullName, setFullName] = useState("");
+  const [age, setAge] = useState("");
+  const [gender, setGender] = useState("male");
+  const [status, setStatus] = useState("stable");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleCreatePatient = async () => {
+    if (!fullName.trim()) {
+      alert("Patient name is required.");
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/patients`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          full_name: fullName,
+          age: age ? Number(age) : null,
+          gender,
+          status,
+          notes,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.message || "Failed to create patient.");
+        return;
+      }
+
+      alert("Patient created successfully.");
+      window.location.reload();
+    } catch (err) {
+      alert("Unable to connect to server.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div>
       <h2 className="page-title">Patient Management</h2>
 
       <div className="section">
-        <button className="primary-btn small-btn">+ Add Patient</button>
+        <button
+          className="primary-btn small-btn"
+          onClick={() => setShowForm(!showForm)}
+        >
+          {showForm ? "Cancel" : "+ Add Patient"}
+        </button>
+
+        {showForm && (
+          <div className="form-card" style={{ marginBottom: "20px" }}>
+            <div className="form-row">
+              <label>Full Name</label>
+              <input
+                type="text"
+                placeholder="Enter patient full name"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+              />
+            </div>
+
+            <div className="form-row">
+              <label>Age</label>
+              <input
+                type="number"
+                placeholder="Enter age"
+                value={age}
+                onChange={(e) => setAge(e.target.value)}
+              />
+            </div>
+
+            <div className="form-row">
+              <label>Gender</label>
+              <select value={gender} onChange={(e) => setGender(e.target.value)}>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <div className="form-row">
+              <label>Status</label>
+              <select value={status} onChange={(e) => setStatus(e.target.value)}>
+                <option value="stable">Stable</option>
+                <option value="needs_attention">Needs Attention</option>
+              </select>
+            </div>
+
+            <div className="form-row">
+              <label>Notes</label>
+              <textarea
+                placeholder="Enter notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              ></textarea>
+            </div>
+
+            <button
+              className="primary-btn"
+              onClick={handleCreatePatient}
+              disabled={saving}
+            >
+              {saving ? "Saving..." : "Save Patient"}
+            </button>
+          </div>
+        )}
 
         {loadingPatients ? (
           <p>Loading patients...</p>
@@ -485,7 +601,7 @@ function Patients({ patients, loadingPatients }) {
                 patients.map((patient, index) => (
                   <tr key={patient.id || index}>
                     <td>{patient.full_name || patient.name}</td>
-                    <td>{patient.age}</td>
+                    <td>{patient.age ?? "N/A"}</td>
                     <td>{patient.status}</td>
                     <td>{patient.gender || "N/A"}</td>
                   </tr>
