@@ -433,33 +433,6 @@ function Dashboard({ patients, alerts, summary, loadingSummary }) {
         </div>
       )}
 
-      <div className="section">
-        <h3>Recent Alerts</h3>
-        <table>
-          <thead>
-            <tr>
-              <th>Patient</th>
-              <th>Alert</th>
-              <th>Time</th>
-            </tr>
-          </thead>
-          <tbody>
-            {alerts.length === 0 ? (
-              <tr>
-                <td colSpan="3">No alerts found.</td>
-              </tr>
-            ) : (
-              alerts.map((item, index) => (
-                <tr key={item.id || index}>
-                  <td>{item.patient?.full_name || item.patient || "N/A"}</td>
-                  <td>{item.alert_type || item.alert || "N/A"}</td>
-                  <td>{item.created_at || item.time || "N/A"}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
     </div>
   );
 }
@@ -792,7 +765,7 @@ function Medications({
     <div>
       <h2 className="page-title">Medication Schedule</h2>
 
-      <div className="form-card">
+      <div className="form-card medication-card">
         <div className="form-row">
           <label>Patient</label>
           <select
@@ -814,7 +787,7 @@ function Medications({
           {loadingSchedules ? (
             <p>Loading schedules...</p>
           ) : (
-            <table>
+            <table className="medication-table">
               <thead>
                 <tr>
                   <th>Medication</th>
@@ -822,7 +795,7 @@ function Medications({
                   <th>Frequency</th>
                   <th>Time</th>
                   <th>Instructions</th>
-                  <th>Action</th>
+                  <th className="actions-column">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -838,27 +811,27 @@ function Medications({
                       <td>{item.frequency}</td>
                       <td>{item.scheduled_time}</td>
                       <td>{item.instructions || "N/A"}</td>
-                      <td style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                        <button
-                          className="primary-btn small-btn"
-                          onClick={() => handleRecordDose(item.id, "taken")}
-                        >
-                          Taken
-                        </button>
-                        <button
-                          className="primary-btn small-btn"
-                          onClick={() => handleRecordDose(item.id, "missed")}
-                          style={{ marginLeft: "8px" }}
-                        >
-                          Missed
-                        </button>
-                        <button
-                          className="primary-btn small-btn"
-                          onClick={() => handleRecordDose(item.id, "skipped")}
-                          style={{ marginLeft: "8px" }}
-                        >
-                          Skipped
-                        </button>
+                      <td className="actions-cell">
+                        <div className="action-btns">
+                          <button
+                            className="dose-btn dose-taken"
+                            onClick={() => handleRecordDose(item.id, "taken")}
+                          >
+                            Taken
+                          </button>
+                          <button
+                            className="dose-btn dose-missed"
+                            onClick={() => handleRecordDose(item.id, "missed")}
+                          >
+                            Missed
+                          </button>
+                          <button
+                            className="dose-btn dose-skipped"
+                            onClick={() => handleRecordDose(item.id, "skipped")}
+                          >
+                            Skipped
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))

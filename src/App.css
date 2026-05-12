@@ -95,6 +95,17 @@ body {
   max-width: 760px;
 }
 
+.medication-card {
+  box-sizing: border-box;
+  max-width: 1180px;
+  width: 100%;
+}
+
+.medication-card .section {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
 .login-wrapper {
   display: flex;
   justify-content: center;
@@ -225,20 +236,32 @@ table th {
   resize: vertical;
 }
 
+.medication-table .actions-column {
+  min-width: 260px;
+}
+
+.actions-cell {
+  min-width: 260px;
+}
+
 .action-btns {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(72px, 1fr));
   gap: 8px;
-  flex-wrap: wrap;
   align-items: center;
 }
 
 .dose-btn {
-  padding: 8px 12px;
+  min-height: 36px;
+  padding: 8px 10px;
   border: none;
   border-radius: 6px;
   cursor: pointer;
   font-size: 0.85em;
   font-weight: bold;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .dose-taken {
@@ -294,5 +317,14 @@ table th {
 
   table {
     font-size: 14px;
+  }
+
+  .medication-table .actions-column,
+  .actions-cell {
+    min-width: 220px;
+  }
+
+  .action-btns {
+    grid-template-columns: 1fr;
   }
 }
